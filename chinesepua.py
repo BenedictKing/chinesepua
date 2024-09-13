@@ -2,6 +2,7 @@ import io
 import random
 import re
 import time
+import threading
 
 import plugins
 import requests
@@ -98,44 +99,54 @@ class ChinesePua(Plugin):
                         reply_text = re.split("```", text)[0].strip()
 
                     if html_content:
-                        try:
-                            tmp_path = (
-                                TmpDir().path() + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
-                            )
+                        # 创建新线程来处理HTML渲染
+                        thread = threading.Thread(target=self.render_html_to_image, args=(html_content, e_context))
+                        thread.start()
 
-                            with sync_playwright() as p:
-                                browser = p.chromium.launch()
-                                page = browser.new_page(
-                                    viewport={"width": 1080, "height": 1280},
-                                    device_scale_factor=2,
-                                )
-                                page.set_content(html_content)
-
-                                # 等待.card元素加载完成
-                                card_element = page.wait_for_selector(".card")
-
-                                if card_element:
-                                    card_element.screenshot(path=tmp_path)
-                                else:
-                                    # 如果没有找到.card元素，则截取整个页面
-                                    page.screenshot(path=tmp_path)
-
-                                browser.close()
-
-                            # 读取生成的图片文件
-                            with open(tmp_path, "rb") as image_file:
-                                img_byte_arr = io.BytesIO(image_file.read())
-
-                            _send_img(e_context, img_byte_arr)
-
-                        except Exception as e:
-                            logger.error(f"HTML渲染为图片失败: {e}")
-                            # 如果转换失败,保留原始HTML内容
-
+                        reply_text+="\n\n卡片正在生成中, 稍后奉上"
+                    
                     _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
+
                 except Exception as e:
                     logger.error(f"[chinesepua] 错误: {e}")
                     _set_reply_text("生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.TEXT)
+
+
+    def render_html_to_image(self, html_content, e_context):
+        try:
+            tmp_path = (
+                TmpDir().path() + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
+            )
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page(
+                    viewport={"width": 1080, "height": 1280},
+                    device_scale_factor=2,
+                )
+                page.set_content(html_content)
+
+                # 等待.card元素加载完成
+                card_element = page.wait_for_selector(".card")
+
+                if card_element:
+                    card_element.screenshot(path=tmp_path)
+                else:
+                    # 如果没有找到.card元素，则截取整个页面
+                    page.screenshot(path=tmp_path)
+
+                browser.close()
+
+            # 读取生成的图片文件
+            with open(tmp_path, "rb") as image_file:
+                img_byte_arr = io.BytesIO(image_file.read())
+
+            _send_img(e_context, img_byte_arr)
+
+        except Exception as e:
+            logger.error(f"HTML渲染为图片失败: {e}")
+            # 如果转换失败，可以在这里发送一条错误消息
+            _set_reply_text("图片生成失败，请稍后再试。", e_context, level=ReplyType.ERROR)
 
 
 def _set_reply_text(content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR):
