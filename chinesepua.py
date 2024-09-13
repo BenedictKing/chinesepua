@@ -48,6 +48,7 @@ class ChinesePua(Plugin):
             self.api_key = gconf.get("api_key")
             self.api_base = gconf.get("api_base")
             self.api_model = gconf.get("api_model")
+            self.with_text = gconf.get("with_text", False)
             logger.debug("[chinesepua] inited")
         except Exception as e:
             logger.error(f"[chinesepua] init error: {e}")
@@ -59,8 +60,8 @@ class ChinesePua(Plugin):
         context = e_context["context"]
         if context.type not in [ContextType.TEXT]:
             return
-        if context.content.startswith(("PUA", "pua", "吐槽", "槽点")):
-            match = re.search(r"(PUA|pua|吐槽|槽点)(.+)", context.content)
+        if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
+            match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
             if match:
                 keyword = match.group(2).strip()  # 获取搜索关键词
                 logger.debug(f"[chinesepua] 吐槽: {keyword}")
@@ -87,36 +88,36 @@ class ChinesePua(Plugin):
                     response.raise_for_status()
                     text = response.json()["choices"][0]["message"]["content"]
                     logger.debug(f"[chinesepua] 回复: {text}")
-                    # 提取SVG内容
+
                     html_match = re.search(r"```html(.*?)```", text, re.DOTALL)
                     if html_match:
                         html_content = html_match.group(1).strip()
                     else:
                         html_content = ""
 
-                    reply_text = re.split("```", text)[-1].strip()
-                    if not reply_text:
-                        reply_text = re.split("```", text)[0].strip()
+                    if self.with_text:
+                        reply_text = re.split("```", text)[-1].strip()
+                        if not reply_text:
+                            reply_text = re.split("```", text)[0].strip()
+                    else:
+                        reply_text = "卡片生成中..."
 
                     if html_content:
                         # 创建新线程来处理HTML渲染
                         thread = threading.Thread(target=self.render_html_to_image, args=(html_content, e_context))
                         thread.start()
 
-                        reply_text+="\n\n卡片正在生成中, 稍后奉上"
-                    
+                        reply_text += "\n\n卡片正在生成中..."
+
                     _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
 
                 except Exception as e:
                     logger.error(f"[chinesepua] 错误: {e}")
-                    _set_reply_text("生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.TEXT)
-
+                    _set_reply_text("解释失败，请稍后再试...", e_context, level=ReplyType.TEXT)
 
     def render_html_to_image(self, html_content, e_context):
         try:
-            tmp_path = (
-                TmpDir().path() + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
-            )
+            tmp_path = TmpDir().path() + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
 
             with sync_playwright() as p:
                 browser = p.chromium.launch()
@@ -146,13 +147,19 @@ class ChinesePua(Plugin):
         except Exception as e:
             logger.error(f"HTML渲染为图片失败: {e}")
             # 如果转换失败，可以在这里发送一条错误消息
-            _set_reply_text("图片生成失败，请稍后再试。", e_context, level=ReplyType.ERROR)
+            _send_reply_text("生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.ERROR)
 
 
 def _set_reply_text(content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR):
     reply = Reply(level, content)
     e_context["reply"] = reply
     e_context.action = EventAction.BREAK_PASS
+
+
+def _send_reply_text(content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR):
+    reply = Reply(level, content)
+    channel = e_context["channel"]
+    channel.send(reply, e_context["context"])
 
 
 def _send_img(e_context: EventContext, content: any):
