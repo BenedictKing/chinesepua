@@ -9,3 +9,4 @@ tmp
 *.log
 nohup.out
 config.json
+.aider*

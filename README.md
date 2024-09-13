@@ -2,6 +2,8 @@
 
 ChinesePUA 是一个为 chatgpt-on-wechat 设计的插件,灵感来源于李继刚和云中江树的创意。它能够为中文词语提供幽默而富有创意的新解释,并生成一张方便分享的文字卡片。
 
+特别感谢云中江树大神收录 [飞书文档: 玩转"汉语新解"？我用通义AI直出爆款文字卡片](https://langgptai.feishu.cn/wiki/WKaEwX5LMirfJlkenf6cKGDGnJg)
+
 ## 功能
 
 - 输入 "吐槽 [词语]" 或者 "pua [词语]" 即可获得该词语的幽默新解释
@@ -27,8 +29,8 @@ ChinesePUA 是一个为 chatgpt-on-wechat 设计的插件,灵感来源于李继�
 可以在 `config.json` 中进行以下配置:
 
 - `api_key`: API密钥
-- `api_base`: API基础URL
-- `api_model`: 使用的API模型，默认 `gpt-4o-mini`
+- `api_base`: API基础URL, 例如 `https://api.openai.com/v1`
+- `api_model`: 使用的API模型, 默认 `gpt-4o-mini`
 
 ## 注意事项
 

@@ -93,9 +93,9 @@ class ChinesePua(Plugin):
                     else:
                         html_content = ""
 
-                    after_html = re.split("```", text)[-1].strip()
-                    if not after_html:
-                        after_html = re.split("```", text)[0].strip()
+                    reply_text = re.split("```", text)[-1].strip()
+                    if not reply_text:
+                        reply_text = re.split("```", text)[0].strip()
 
                     if html_content:
                         try:
@@ -105,26 +105,16 @@ class ChinesePua(Plugin):
 
                             with sync_playwright() as p:
                                 browser = p.chromium.launch()
-                                page = browser.new_page(viewport={"width": 1080, "height": 1280}, device_scale_factor=2)
+                                page = browser.new_page(
+                                    viewport={"width": 1080, "height": 1280},
+                                    device_scale_factor=2,
+                                )
                                 page.set_content(html_content)
 
                                 # 等待.card元素加载完成
                                 card_element = page.wait_for_selector(".card")
 
                                 if card_element:
-                                    # original_box = card_element.bounding_box()
-                                    # # 计算新的截图区域
-
-                                    # new_box = {
-                                    #     "x": max(0, original_box["x"]),
-                                    #     "y": max(0, original_box["y"]),
-                                    #     "width": original_box["width"] * 4,
-                                    #     "height": original_box["height"] * 4,
-                                    # }
-                                    # print(new_box)
-
-                                    # # 截取指定区域
-                                    # page.screenshot(path=tmp_path, clip=new_box)
                                     card_element.screenshot(path=tmp_path)
                                 else:
                                     # 如果没有找到.card元素，则截取整个页面
@@ -142,7 +132,7 @@ class ChinesePua(Plugin):
                             logger.error(f"HTML渲染为图片失败: {e}")
                             # 如果转换失败,保留原始HTML内容
 
-                    _set_reply_text(after_html, e_context, level=ReplyType.TEXT)
+                    _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
                 except Exception as e:
                     logger.error(f"[chinesepua] 错误: {e}")
                     _set_reply_text("生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.TEXT)
