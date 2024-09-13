@@ -107,7 +107,8 @@ class ChinesePua(Plugin):
                         thread = threading.Thread(target=self.render_html_to_image, args=(html_content, e_context))
                         thread.start()
 
-                        reply_text += "\n\n卡片正在生成中..."
+                        if self.with_text:
+                            reply_text += "\n\n卡片正在生成中..."
 
                     _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
 
