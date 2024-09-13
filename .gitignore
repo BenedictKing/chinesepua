@@ -8,3 +8,4 @@ __pycache__/
 tmp
 *.log
 nohup.out
+config.json
