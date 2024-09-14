@@ -13,7 +13,7 @@ from common.tmp_dir import TmpDir
 from playwright.sync_api import sync_playwright
 from plugins import *
 
-from .prompts import chinese_teacher, chinese_teacher_claude
+from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2
 
 
 def read_file(path):
@@ -36,9 +36,10 @@ class ChinesePua(Plugin):
         if not gconf:
             curdir = os.path.dirname(__file__)
             tm_path = os.path.join(curdir, "config.json.template")
-            if os.path.exists(self.json_path):
+            json_path = os.path.join(curdir, "config.json")
+            if os.path.exists(json_path):
                 # 读取config.json配置文件
-                gconf = json.loads(read_file(self.json_path))
+                gconf = json.loads(read_file(json_path))
             elif os.path.exists(tm_path):
                 # 读取config.json.template配置文件
                 gconf = json.loads(read_file(tm_path))
@@ -66,7 +67,9 @@ class ChinesePua(Plugin):
                 keyword = match.group(2).strip()  # 获取搜索关键词
                 logger.debug(f"[chinesepua] 吐槽: {keyword}")
                 if len(keyword) > 8:
-                    _set_reply_text("输入太长了，简短一些吧", e_context, level=ReplyType.TEXT)
+                    _set_reply_text(
+                        "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
+                    )
                     return
                 try:
                     response = requests.post(
@@ -80,7 +83,10 @@ class ChinesePua(Plugin):
                             "model": self.api_model,
                             "messages": [
                                 {"role": "system", "content": chinese_teacher},
-                                {"role": "assistant", "content": "说吧, 他们又用哪个词来忽悠你了?"},
+                                {
+                                    "role": "assistant",
+                                    "content": "说吧, 他们又用哪个词来忽悠你了?",
+                                },
                                 {"role": "user", "content": keyword},
                             ],
                         },
@@ -93,18 +99,45 @@ class ChinesePua(Plugin):
                     if html_match:
                         html_content = html_match.group(1).strip()
                     else:
-                        html_content = ""
+                        svg_match = re.search(r"<svg.*?</svg>", text, re.DOTALL)
+                        if svg_match:
+                            svg_content = svg_match.group(0)
+                            html_content = f"""
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+    <title>汉语新解</title>
+</head>
+<body>
+    <div class="card" style="width: 300px; height: 500px;">
+        {svg_content}
+    </div>
+</body>
+</html>
+"""
+                        else:
+                            html_content = ""
 
                     if self.with_text:
                         reply_text = re.split("```", text)[-1].strip()
                         if not reply_text:
                             reply_text = re.split("```", text)[0].strip()
+                        if not reply_text:
+                            reply_text = re.split("</svg>", text)[-1].strip()
+                        if not reply_text:
+                            reply_text = re.split("<svg", text)[0].strip()
                     else:
                         reply_text = "卡片生成中..."
 
                     if html_content:
                         # 创建新线程来处理HTML渲染
-                        thread = threading.Thread(target=self.render_html_to_image, args=(html_content, e_context))
+                        thread = threading.Thread(
+                            target=self.render_html_to_image,
+                            args=(html_content, e_context),
+                        )
                         thread.start()
 
                         if self.with_text:
@@ -114,11 +147,16 @@ class ChinesePua(Plugin):
 
                 except Exception as e:
                     logger.error(f"[chinesepua] 错误: {e}")
-                    _set_reply_text("解释失败，请稍后再试...", e_context, level=ReplyType.TEXT)
+                    _set_reply_text(
+                        "解释失败，请稍后再试...", e_context, level=ReplyType.TEXT
+                    )
 
     def render_html_to_image(self, html_content, e_context):
         try:
-            tmp_path = TmpDir().path() + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
+            tmp_path = (
+                TmpDir().path()
+                + f"chinesepua_{int(time.time())}_{random.randint(1000, 9999)}.png"
+            )
 
             with sync_playwright() as p:
                 browser = p.chromium.launch()
@@ -148,16 +186,22 @@ class ChinesePua(Plugin):
         except Exception as e:
             logger.error(f"HTML渲染为图片失败: {e}")
             # 如果转换失败，可以在这里发送一条错误消息
-            _send_reply_text("生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.ERROR)
+            _send_reply_text(
+                "生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.ERROR
+            )
 
 
-def _set_reply_text(content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR):
+def _set_reply_text(
+    content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR
+):
     reply = Reply(level, content)
     e_context["reply"] = reply
     e_context.action = EventAction.BREAK_PASS
 
 
-def _send_reply_text(content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR):
+def _send_reply_text(
+    content: str, e_context: EventContext, level: ReplyType = ReplyType.ERROR
+):
     reply = Reply(level, content)
     channel = e_context["channel"]
     channel.send(reply, e_context["context"])
