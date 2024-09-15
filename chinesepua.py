@@ -13,7 +13,7 @@ from common.tmp_dir import TmpDir
 from playwright.sync_api import sync_playwright
 from plugins import *
 
-from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2
+from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2,card_designer
 
 
 def read_file(path):
@@ -24,7 +24,7 @@ def read_file(path):
 @plugins.register(
     name="chinesepua",
     desc="A plugin that generates satirical explanation cards for Chinese phrases",
-    version="0.1",
+    version="0.3",
     author="BenedictKing",
     desire_priority=115,
 )
@@ -61,6 +61,12 @@ class ChinesePua(Plugin):
         context = e_context["context"]
         if context.type not in [ContextType.TEXT]:
             return
+        if context.content.startswith(("设计", "名片")):
+            match = re.search(r"(设计|名片)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()  # 获取名片内容
+                prompt=card_designer
+                
         if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
             match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
             if match:
@@ -71,38 +77,38 @@ class ChinesePua(Plugin):
                         "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
                     )
                     return
-                try:
-                    response = requests.post(
-                        f"{self.api_base}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                            "Accept": "application/json",
-                        },
-                        json={
-                            "model": self.api_model,
-                            "messages": [
-                                {"role": "system", "content": chinese_teacher},
-                                {
-                                    "role": "assistant",
-                                    "content": "说吧, 他们又用哪个词来忽悠你了?",
-                                },
-                                {"role": "user", "content": keyword},
-                            ],
-                        },
-                    )
-                    response.raise_for_status()
-                    text = response.json()["choices"][0]["message"]["content"]
-                    logger.debug(f"[chinesepua] 回复: {text}")
+                prompt=chinese_teacher
+        
+        if keyword:
+            try:
+                response = requests.post(
+                    f"{self.api_base}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    json={
+                        "model": self.api_model,
+                        "messages": [
+                            {"role": "system", "content": prompt},\
+                            {"role": "user", "content": keyword},
+                        ],
+                    },
+                )
+                response.raise_for_status()
+                text = response.json()["choices"][0]["message"]["content"]
+                logger.debug(f"[chinesepua] 回复: {text}")
 
-                    html_match = re.search(r"```html(.*?)```", text, re.DOTALL)
-                    if html_match:
-                        html_content = html_match.group(1).strip()
-                    else:
-                        svg_match = re.search(r"<svg.*?</svg>", text, re.DOTALL)
-                        if svg_match:
-                            svg_content = svg_match.group(0)
-                            html_content = f"""
+                html_match = re.search(r"```html(.*?)```", text, re.DOTALL)
+                if html_match:
+                    html_content = html_match.group(1).strip()
+                else:
+                    svg_match = re.search(r"<svg.*?</svg>", text, re.DOTALL)
+                    if svg_match:
+                        svg_content = svg_match.group(0)
+                        html_content = (
+                            """
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -110,46 +116,70 @@ class ChinesePua(Plugin):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
     <title>汉语新解</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+        .card {
+            width: 400px;
+            height: 600px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
 </head>
+"""
+                                + f"""
 <body>
-    <div class="card" style="width: 300px; height: 500px;">
+    <div class="card">
         {svg_content}
     </div>
 </body>
 </html>
 """
-                        else:
-                            html_content = ""
+                            )
+                    else:
+                        html_content = ""
+
+                if self.with_text:
+                    reply_text = re.split("```", text)[-1].strip()
+                    if not reply_text:
+                        reply_text = re.split("```", text)[0].strip()
+                    if not reply_text:
+                        reply_text = re.split("</svg>", text)[-1].strip()
+                    if not reply_text:
+                        reply_text = re.split("<svg", text)[0].strip()
+                else:
+                    reply_text = "卡片生成中..."
+
+                if html_content:
+                    # 创建新线程来处理HTML渲染
+                    thread = threading.Thread(
+                        target=self.render_html_to_image,
+                        args=(html_content, e_context),
+                    )
+                    thread.start()
+                    logger.debug(f"[chinesepua] 卡片正在生成中...")
 
                     if self.with_text:
-                        reply_text = re.split("```", text)[-1].strip()
-                        if not reply_text:
-                            reply_text = re.split("```", text)[0].strip()
-                        if not reply_text:
-                            reply_text = re.split("</svg>", text)[-1].strip()
-                        if not reply_text:
-                            reply_text = re.split("<svg", text)[0].strip()
-                    else:
-                        reply_text = "卡片生成中..."
+                        reply_text += "\n\n卡片正在生成中..."
 
-                    if html_content:
-                        # 创建新线程来处理HTML渲染
-                        thread = threading.Thread(
-                            target=self.render_html_to_image,
-                            args=(html_content, e_context),
-                        )
-                        thread.start()
+                _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
 
-                        if self.with_text:
-                            reply_text += "\n\n卡片正在生成中..."
-
-                    _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
-
-                except Exception as e:
-                    logger.error(f"[chinesepua] 错误: {e}")
-                    _set_reply_text(
-                        "解释失败，请稍后再试...", e_context, level=ReplyType.TEXT
-                    )
+            except Exception as e:
+                logger.error(f"[chinesepua] 错误: {e}")
+                _set_reply_text(
+                    "解释失败，请稍后再试...", e_context, level=ReplyType.TEXT
+                )
 
     def render_html_to_image(self, html_content, e_context):
         try:
@@ -161,7 +191,7 @@ class ChinesePua(Plugin):
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 page = browser.new_page(
-                    viewport={"width": 1080, "height": 1280},
+                    viewport={"width": 1080, "height": 2560},
                     device_scale_factor=2,
                 )
                 page.set_content(html_content)
@@ -189,6 +219,10 @@ class ChinesePua(Plugin):
             _send_reply_text(
                 "生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.ERROR
             )
+
+    # 帮助文档
+    def get_help_text(self, **kwargs):
+        return "生成汉语新解卡片，使用方法，输入：解释 词语"
 
 
 def _set_reply_text(
