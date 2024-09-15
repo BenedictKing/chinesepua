@@ -13,7 +13,7 @@ from common.tmp_dir import TmpDir
 from playwright.sync_api import sync_playwright
 from plugins import *
 
-from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2,card_designer
+from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2, card_designer
 
 
 def read_file(path):
@@ -68,7 +68,7 @@ class ChinesePua(Plugin):
             match = re.search(r"(设计|名片)(.+)", context.content)
             if match:
                 keyword = match.group(2).strip()  # 获取名片内容
-                prompt=card_designer
+                prompt = card_designer
                 
         if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
             match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
@@ -80,10 +80,11 @@ class ChinesePua(Plugin):
                         "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
                     )
                     return
-                prompt=chinese_teacher
+                prompt = chinese_teacher
         
         if keyword:
             try:
+                # 在请求体中添加 max_tokens 参数
                 response = requests.post(
                     f"{self.api_base}/chat/completions",
                     headers={
@@ -97,6 +98,7 @@ class ChinesePua(Plugin):
                             {"role": "system", "content": prompt},\
                             {"role": "user", "content": keyword},
                         ],
+                        "max_tokens": 2048  # 设置 max_tokens 参数
                     },
                 )
                 response.raise_for_status()
