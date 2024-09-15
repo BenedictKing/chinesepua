@@ -61,6 +61,9 @@ class ChinesePua(Plugin):
         context = e_context["context"]
         if context.type not in [ContextType.TEXT]:
             return
+        
+        keyword=None
+        
         if context.content.startswith(("设计", "名片")):
             match = re.search(r"(设计|名片)(.+)", context.content)
             if match:
