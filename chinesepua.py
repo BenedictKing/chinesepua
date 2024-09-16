@@ -13,7 +13,12 @@ from common.tmp_dir import TmpDir
 from playwright.sync_api import sync_playwright
 from plugins import *
 
-from .prompts import chinese_teacher, chinese_teacher_claude, chinese_teacher_claude_v2,card_designer
+from .prompts import (
+    chinese_teacher,
+    chinese_teacher_claude,
+    chinese_teacher_claude_v2,
+    card_designer,
+)
 
 
 def read_file(path):
@@ -26,7 +31,7 @@ def read_file(path):
     desc="A plugin that generates satirical explanation cards for Chinese phrases",
     version="0.3",
     author="BenedictKing",
-    desire_priority=115,
+    desire_priority=90,
 )
 class ChinesePua(Plugin):
     def __init__(self):
@@ -49,6 +54,7 @@ class ChinesePua(Plugin):
             self.api_key = gconf.get("api_key")
             self.api_base = gconf.get("api_base")
             self.api_model = gconf.get("api_model")
+            self.max_tokens = gconf.get("max_tokens", 0)
             self.with_text = gconf.get("with_text", False)
             logger.debug("[chinesepua] inited")
         except Exception as e:
@@ -61,15 +67,15 @@ class ChinesePua(Plugin):
         context = e_context["context"]
         if context.type not in [ContextType.TEXT]:
             return
-        
-        keyword=None
-        
+
+        keyword = None
+
         if context.content.startswith(("设计", "名片")):
             match = re.search(r"(设计|名片)(.+)", context.content)
             if match:
                 keyword = match.group(2).strip()  # 获取名片内容
-                prompt=card_designer
-                
+                prompt = card_designer
+
         if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
             match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
             if match:
@@ -80,10 +86,20 @@ class ChinesePua(Plugin):
                         "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
                     )
                     return
-                prompt=chinese_teacher
-        
+                prompt = chinese_teacher
+
         if keyword:
             try:
+                payload = {
+                    "model": self.api_model,
+                    "messages": [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": keyword},
+                    ],
+                }
+                if self.max_tokens > 0:
+                    payload["max_tokens"] = self.max_tokens
+
                 response = requests.post(
                     f"{self.api_base}/chat/completions",
                     headers={
@@ -91,13 +107,7 @@ class ChinesePua(Plugin):
                         "Content-Type": "application/json",
                         "Accept": "application/json",
                     },
-                    json={
-                        "model": self.api_model,
-                        "messages": [
-                            {"role": "system", "content": prompt},\
-                            {"role": "user", "content": keyword},
-                        ],
-                    },
+                    json=payload,
                 )
                 response.raise_for_status()
                 text = response.json()["choices"][0]["message"]["content"]
@@ -141,7 +151,7 @@ class ChinesePua(Plugin):
     </style>
 </head>
 """
-                                + f"""
+                            + f"""
 <body>
     <div class="card">
         {svg_content}
@@ -149,7 +159,7 @@ class ChinesePua(Plugin):
 </body>
 </html>
 """
-                            )
+                        )
                     else:
                         html_content = ""
 
