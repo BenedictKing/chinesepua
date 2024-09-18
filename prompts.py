@@ -179,7 +179,7 @@ prompt_chinese_teacher = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>汉语新解 - 金融杠杆</title>
-    <link href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/noto-sans-sc@37.0.0/all.min.css" rel="stylesheet">
     <style>
         :root {
             /* 莫兰迪色系：使用柔和、低饱和度的颜色 */
