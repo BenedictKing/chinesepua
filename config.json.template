@@ -2,6 +2,9 @@
     "api_key": "",
     "api_base": "",
     "api_model": "gpt-4o-mini",
+    "claude_key": "",
+    "claude_base": "",
+    "claude_model": "claude-3-5-sonnet-20240620",
     "max_tokens": 2048,
     "with_text": false
 }

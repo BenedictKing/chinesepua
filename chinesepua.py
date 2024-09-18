@@ -13,12 +13,7 @@ from common.tmp_dir import TmpDir
 from playwright.sync_api import sync_playwright
 from plugins import *
 
-from .prompts import (
-    chinese_teacher,
-    chinese_teacher_claude,
-    chinese_teacher_claude_v2,
-    card_designer,
-)
+from .prompts import get_prompt
 
 
 def read_file(path):
@@ -29,7 +24,7 @@ def read_file(path):
 @plugins.register(
     name="chinesepua",
     desc="A plugin that generates satirical explanation cards for Chinese phrases",
-    version="0.3",
+    version="0.4",
     author="BenedictKing",
     desire_priority=90,
 )
@@ -54,6 +49,9 @@ class ChinesePua(Plugin):
             self.api_key = gconf.get("api_key")
             self.api_base = gconf.get("api_base")
             self.api_model = gconf.get("api_model")
+            self.claude_key = gconf.get("claude_key")
+            self.claude_base = gconf.get("claude_base")
+            self.claude_model = gconf.get("claude_model", "claude-3-5-sonnet-20240620")
             self.max_tokens = gconf.get("max_tokens", 0)
             self.with_text = gconf.get("with_text", False)
             logger.debug("[chinesepua] inited")
@@ -74,26 +72,55 @@ class ChinesePua(Plugin):
             match = re.search(r"(设计|名片)(.+)", context.content)
             if match:
                 keyword = match.group(2).strip()  # 获取名片内容
-                prompt = card_designer
+                logger.debug(f"[chinesepua] 名片: {keyword}")
+                prompt = get_prompt("card_designer")
+
+        if context.content.startswith(("解字", "字典", "字源")):
+            match = re.search(r"(解字|字典|字源)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()  # 获取搜索关键词
+                logger.debug(f"[chinesepua] 解字: {keyword}")
+                if len(keyword) > 10:
+                    _set_reply_text(
+                        "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
+                    )
+                    return
+                prompt = get_prompt("word_explainer")
 
         if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
             match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
             if match:
                 keyword = match.group(2).strip()  # 获取搜索关键词
                 logger.debug(f"[chinesepua] 吐槽: {keyword}")
-                if len(keyword) > 8:
+                if "claude" in keyword:
+                    keyword = keyword.replace("claude", "")
+                    prompt = get_prompt("chinese_teacher_claude")
+                else:
+                    prompt = get_prompt("chinese_teacher")
+                if len(keyword) > 10:
                     _set_reply_text(
                         "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
                     )
                     return
-                prompt = chinese_teacher
+
+        if prompt.force_claude and not (self.claude_base and self.claude_key):
+            _set_reply_text(
+                "这个功能需要Claude API，请先配置好再使用",
+                e_context,
+                level=ReplyType.TEXT,
+            )
+            return
 
         if keyword:
             try:
                 payload = {
-                    "model": self.api_model,
+                    "model": (
+                        self.claude_model
+                        if prompt.force_claude and self.claude_base and self.claude_key
+                        else self.api_model
+                    ),
                     "messages": [
-                        {"role": "system", "content": prompt},
+                        {"role": "system", "content": prompt.content},
                         {"role": "user", "content": keyword},
                     ],
                 }
@@ -111,7 +138,7 @@ class ChinesePua(Plugin):
                 )
                 response.raise_for_status()
                 text = response.json()["choices"][0]["message"]["content"]
-                logger.debug(f"[chinesepua] 回复: {text}")
+                logger.debug(f"[chinesepua] payload: {payload} 回复: {text}")
 
                 html_match = re.search(r"```html(.*?)```", text, re.DOTALL)
                 if html_match:
@@ -140,8 +167,6 @@ class ChinesePua(Plugin):
             font-family: 'Noto Sans SC', sans-serif;
         }
         .card {
-            width: 400px;
-            height: 600px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
             position: relative;
