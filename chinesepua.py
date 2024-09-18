@@ -67,6 +67,7 @@ class ChinesePua(Plugin):
             return
 
         keyword = None
+        prompt = None
 
         if context.content.startswith(("设计", "名片")):
             match = re.search(r"(设计|名片)(.+)", context.content)
@@ -92,8 +93,8 @@ class ChinesePua(Plugin):
             if match:
                 keyword = match.group(2).strip()  # 获取搜索关键词
                 logger.debug(f"[chinesepua] 吐槽: {keyword}")
-                if "claude" in keyword:
-                    keyword = keyword.replace("claude", "")
+                if "claude" in keyword or "Claude" in keyword:
+                    keyword = keyword.replace("claude", "").replace("Claude", "")
                     prompt = get_prompt("chinese_teacher_claude")
                 else:
                     prompt = get_prompt("chinese_teacher")
@@ -103,7 +104,11 @@ class ChinesePua(Plugin):
                     )
                     return
 
-        if prompt.force_claude and not (self.claude_base and self.claude_key):
+        if (
+            prompt
+            and prompt.force_claude
+            and not (self.claude_base and self.claude_key)
+        ):
             _set_reply_text(
                 "这个功能需要Claude API，请先配置好再使用",
                 e_context,
