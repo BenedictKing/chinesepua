@@ -197,7 +197,12 @@ class ChinesePua(Plugin):
                     payload["max_tokens"] = self.max_tokens
 
                 response = requests.post(
-                    f"{self.api_base}/chat/completions",
+                    "%s/chat/completions"
+                    % (
+                        self.claude_base
+                        if prompt.force_claude and self.claude_base and self.claude_key
+                        else self.api_base
+                    ),
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
