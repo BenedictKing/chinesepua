@@ -184,9 +184,7 @@ class ChinesePua(Plugin):
             try:
                 payload = {
                     "model": (
-                        self.claude_model
-                        if prompt.force_claude and self.claude_base and self.claude_key
-                        else self.api_model
+                        self.claude_model if prompt.force_claude else self.api_model
                     ),
                     "messages": [
                         {"role": "system", "content": prompt.content},
@@ -198,11 +196,7 @@ class ChinesePua(Plugin):
 
                 response = requests.post(
                     "%s/chat/completions"
-                    % (
-                        self.claude_base
-                        if prompt.force_claude and self.claude_base and self.claude_key
-                        else self.api_base
-                    ),
+                    % (self.claude_base if prompt.force_claude else self.api_base),
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
