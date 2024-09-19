@@ -24,7 +24,7 @@ def read_file(path):
 @plugins.register(
     name="chinesepua",
     desc="A plugin that generates satirical explanation cards for Chinese phrases",
-    version="0.4",
+    version="0.5",
     author="BenedictKing",
     desire_priority=90,
 )
@@ -72,14 +72,14 @@ class ChinesePua(Plugin):
         if context.content.startswith(("设计", "名片")):
             match = re.search(r"(设计|名片)(.+)", context.content)
             if match:
-                keyword = match.group(2).strip()  # 获取名片内容
+                keyword = match.group(2).strip()
                 logger.debug(f"[chinesepua] 名片: {keyword}")
                 prompt = get_prompt("card_designer")
 
         if context.content.startswith(("解字", "字典", "字源")):
             match = re.search(r"(解字|字典|字源)(.+)", context.content)
             if match:
-                keyword = match.group(2).strip()  # 获取搜索关键词
+                keyword = match.group(2).strip()
                 logger.debug(f"[chinesepua] 解字: {keyword}")
                 if len(keyword) > 10:
                     _set_reply_text(
@@ -91,7 +91,7 @@ class ChinesePua(Plugin):
         if context.content.startswith(("PUA", "pua", "吐槽", "槽点", "解释", "新解")):
             match = re.search(r"(PUA|pua|吐槽|槽点|解释|新解)(.+)", context.content)
             if match:
-                keyword = match.group(2).strip()  # 获取搜索关键词
+                keyword = match.group(2).strip()
                 logger.debug(f"[chinesepua] 吐槽: {keyword}")
                 if "claude" in keyword or "Claude" in keyword:
                     keyword = keyword.replace("claude", "").replace("Claude", "")
@@ -103,6 +103,69 @@ class ChinesePua(Plugin):
                         "输入太长了，简短一些吧", e_context, level=ReplyType.TEXT
                     )
                     return
+
+        if context.content.startswith(("翻译")):
+            match = re.search(r"(翻译)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 翻译: {keyword}")
+                prompt = get_prompt("translate_expert")
+
+        if context.content.startswith(("论证", "分析")):
+            match = re.search(r"(论证|分析)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 论证: {keyword}")
+                prompt = get_prompt("argument_analyser")
+
+        if context.content.startswith(("撕考者", "思考者", "思考", "撕考")):
+            match = re.search(r"(撕考者|思考者|思考|撕考)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 思考: {keyword}")
+                prompt = get_prompt("thinker")
+
+        if context.content.startswith(("深度思考者", "深度思考", "沉思", "琢磨")):
+            match = re.search(r"(深度思考者|深度思考|沉思|琢磨)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 深度思考: {keyword}")
+                prompt = get_prompt("deep_thinker")
+
+        if context.content.startswith(("概念", "概念解释")):
+            match = re.search(r"(概念|概念解释)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 概念: {keyword}")
+                prompt = get_prompt("concept_explainer")
+
+        if context.content.startswith(("哲学家", "哲学")):
+            match = re.search(r"(哲学家|哲学)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 哲学家: {keyword}")
+                prompt = get_prompt("philosopher")
+
+        if context.content.startswith(("互联网", "web2")):
+            match = re.search(r"(互联网|web2)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 互联网: {keyword}")
+                prompt = get_prompt("web2_expert")
+
+        if context.content.startswith(("知识", "知识卡")):
+            match = re.search(r"(知识|知识卡)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 知识: {keyword}")
+                prompt = get_prompt("knowledge_card")
+
+        if context.content.startswith(("单词", "单词卡")):
+            match = re.search(r"(单词|单词卡)(.+)", context.content)
+            if match:
+                keyword = match.group(2).strip()
+                logger.debug(f"[chinesepua] 单词: {keyword}")
+                prompt = get_prompt("word_card")
 
         if (
             prompt
@@ -143,7 +206,7 @@ class ChinesePua(Plugin):
                 )
                 response.raise_for_status()
                 text = response.json()["choices"][0]["message"]["content"]
-                logger.debug(f"[chinesepua] payload: {payload} 回复: {text}")
+                logger.debug(f"[chinesepua] 回复: {text}")
 
                 html_match = re.search(r"```html(.*?)```", text, re.DOTALL)
                 if html_match:
@@ -159,7 +222,7 @@ class ChinesePua(Plugin):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/noto-sans-sc@37.0.0/all.min.css" rel="stylesheet">
     <title>汉语新解</title>
     <style>
         body, html {
@@ -215,6 +278,10 @@ class ChinesePua(Plugin):
 
                     if self.with_text:
                         reply_text += "\n\n卡片正在生成中..."
+                elif not self.with_text:
+                    reply_text = "生成失败，请检查模型输出结果"
+                    _set_reply_text(reply_text, e_context, level=ReplyType.ERROR)
+                    return
 
                 _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
 
