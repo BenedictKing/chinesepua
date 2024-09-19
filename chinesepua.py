@@ -280,7 +280,7 @@ class ChinesePua(Plugin):
                         reply_text += "\n\n卡片正在生成中..."
                 elif not self.with_text:
                     reply_text = "生成失败，请检查模型输出结果"
-                    _set_reply_text(reply_text, e_context, level=ReplyType.ERROR)
+                    _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
                     return
 
                 _set_reply_text(reply_text, e_context, level=ReplyType.TEXT)
@@ -327,7 +327,7 @@ class ChinesePua(Plugin):
             logger.error(f"HTML渲染为图片失败: {e}")
             # 如果转换失败，可以在这里发送一条错误消息
             _send_reply_text(
-                "生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.ERROR
+                "生成卡片失败，请稍后再试。。。", e_context, level=ReplyType.TEXT
             )
 
     # 帮助文档
