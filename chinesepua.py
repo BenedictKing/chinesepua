@@ -40,10 +40,11 @@ class ChinesePua(Plugin):
             if os.path.exists(json_path):
                 # 读取config.json配置文件
                 gconf = json.loads(read_file(json_path))
+                logger.debug(f"[chinesepua] 从config.json读取配置: {gconf}")
             elif os.path.exists(tm_path):
                 # 读取config.json.template配置文件
                 gconf = json.loads(read_file(tm_path))
-
+                logger.debug(f"[chinesepua] 读取config.json.template读取配置: {gconf}")
         try:
             self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
             self.api_key = gconf.get("api_key")
